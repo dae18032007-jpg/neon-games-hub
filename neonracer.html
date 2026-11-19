@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON RUSH 3D | Киберпанк-раннер</title>
+    <!-- Шрифты для футуристичного интерфейса -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+    <!-- Three.js r128 через CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff007f;
+            --neon-purple: #9d4edd;
+            --neon-yellow: #ffbe0b;
+            --neon-green: #00f59b;
+            --bg-dark: #05060f;
+            --glass: rgba(10, 14, 30, 0.72);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Montserrat', sans-serif;
+            color: #f8fafc;
+            touch-action: none;
+        }
+
+        /* Полноэкранный контейнер для 3D-сцены */
+        #game-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Лёгкий эффект виньетки и сканлайнов для атмосферы */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: radial-gradient(circle at center, transparent 55%, rgba(3, 4, 12, 0.78) 100%);
+        }
+
+        /* Верхний футуристичный HUD */
+        .hud {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            z-index: 5;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .hud-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .hud-card {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 14px;
+            padding: 8px 14px;
+            min-width: 96px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 0 12px rgba(0, 243, 255, 0.06);
+        }
+
+        .hud-label {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: #94a3b8;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1rem, 2.2vw, 1.35rem);
+            font-weight: 800;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.45);
+        }
+
+        .hud-value.gold {
+            color: var(--neon-yellow);
+            text-shadow: 0 0 10px rgba(255, 190, 11, 0.45);
+        }
+
+        .hud-value.pink {
+            color: var(--neon-pink);
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.45);
+        }
+
+        /* Прогресс-бар энергетического щита */
+        .shield-card {
+            min-width: 155px;
+        }
+
+        .shield-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .shield-status {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: var(--neon-green);
+        }
+
+        .shield-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 99px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 243, 255, 0.2);
+        }
+
+        .shield-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+            box-shadow: 0 0 12px var(--neon-green);
+            transition: width 0.2s ease;
+        }
+
+        .shield-bar-fill.active {
+            background: linear-gradient(90deg, var(--neon-green), #ffffff, var(--neon-cyan));
+            animation: pulseShield 0.8s infinite alternate;
+        }
+
+        @keyframes pulseShield {
+            from { opacity: 0.75; }
+            to { opacity: 1; }
+        }
+
+        /* Кнопки управления звуком и камерой */
+        .hud-actions {
+            display: flex;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .icon-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            color: #f8fafc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+        }
+
+        .icon-btn:hover {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.35);
+        }
+
+        .icon-btn.muted {
+            color: var(--neon-pink);
+            border-color: rgba(255, 0, 127, 0.45);
+        }
+
+        /* Индикатор комбо по центру сверху */
+        .combo-banner {
+            position: fixed;
+            top: 86px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.9);
+            z-index: 5;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 0.95rem;
+            letter-spacing: 2px;
+            color: var(--neon-yellow);
+            text-shadow: 0 0 14px rgba(255, 190, 11, 0.7);
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        .combo-banner.visible {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        /* Модальные оверлеи (Старт / Конец игры) */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            background: rgba(4, 6, 16, 0.78);
+            backdrop-filter: blur(9px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            transition: opacity 0.35s ease, visibility 0.35s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .badge {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: var(--neon-pink);
+            background: rgba(255, 0, 127, 0.14);
+            border: 1px solid rgba(255, 0, 127, 0.45);
+            padding: 6px 16px;
+            border-radius: 99px;
+            margin-bottom: 14px;
+            box-shadow: 0 0 20px rgba(255, 0, 127, 0.2);
+        }
+
+        .overlay h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2rem, 6vw, 3.8rem);
+            font-weight: 900;
+            letter-spacing: 3px;
+            line-height: 1.1;
+            margin-bottom: 14px;
+            background: linear-gradient(90deg, var(--neon-cyan), #ffffff 45%, var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 22px rgba(0, 243, 255, 0.35));
+        }
+
+        .overlay p {
+            max-width: 520px;
+            font-size: clamp(0.9rem, 2vw, 1.05rem);
+            color: #cbd5e1;
+            line-height: 1.55;
+            margin-bottom: 26px;
+        }
+
+        /* Карточки управления */
+        .controls-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            max-width: 620px;
+            margin-bottom: 30px;
+        }
+
+        .control-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 243, 255, 0.25);
+            border-radius: 12px;
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-chip kbd {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.14);
+            border: 1px solid rgba(0, 243, 255, 0.45);
+            padding: 3px 7px;
+            border-radius: 6px;
+        }
+
+        /* Главная кнопка действия */
+        .cyber-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #05060f;
+            background: linear-gradient(135deg, var(--neon-cyan) 0%, #38bdf8 50%, var(--neon-green) 100%);
+            border: none;
+            border-radius: 16px;
+            padding: 16px 42px;
+            cursor: pointer;
+            box-shadow: 0 0 28px rgba(0, 243, 255, 0.55), 0 5px 0 #0284c7;
+            transition: all 0.18s ease;
+        }
+
+        .cyber-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.85), 0 8px 0 #0284c7;
+        }
+
+        .cyber-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.5), 0 2px 0 #0284c7;
+        }
+
+        /* Итоговая статистика на экране Game Over */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(105px, 1fr));
+            gap: 12px;
+            margin-bottom: 28px;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .result-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 14px 10px;
+        }
+
+        .result-box span {
+            display: block;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .result-box strong {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+            color: var(--neon-cyan);
+        }
+
+        .new-record-tag {
+            display: inline-block;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #05060f;
+            background: var(--neon-yellow);
+            padding: 5px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-shadow: 0 0 20px rgba(255, 190, 11, 0.7);
+            animation: bounceTag 0.7s infinite alternate;
+        }
+
+        @keyframes bounceTag {
+            from { transform: scale(1); }
+            to { transform: scale(1.07); }
+        }
+
+        /* Подсказка внизу экрана во время полёта */
+        .bottom-tip {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            font-size: 0.72rem;
+            color: rgba(203, 213, 225, 0.65);
+            letter-spacing: 0.8px;
+            pointer-events: none;
+            text-align: center;
+            width: 90%;
+        }
+
+        @media (max-width: 640px) {
+            .hud {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+            }
+            .hud-card {
+                padding: 6px 10px;
+                min-width: 76px;
+            }
+            .shield-card {
+                min-width: 125px;
+            }
+            .results-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Контейнер Three.js Canvas -->
+    <div id="game-container"></div>
+    <div class="vignette"></div>
+
+    <!-- Верхний HUD -->
+    <div class="hud">
+        <div class="hud-group">
+            <div class="hud-card">
+                <span class="hud-label">Счёт</span>
+                <span class="hud-value" id="hudScore">0</span>
+            </div>
+            <div class="hud-card">
+                <span class="hud-label">Дистанция</span>
+                <span class="hud-value pink" id="hudDistance">0 м</span>
+            </div>
+            <div class="hud-card">
+                <span class="hud-label">Рекорд</span>
+                <span class="hud-value gold" id="hudHighScore">0</span>
+            </div>
+            <div class="hud-card shield-card">
+                <div class="shield-header">
+                    <span class="hud-label" style="margin:0;">Щит</span>
+                    <span class="shield-status" id="shieldText">0 / 10</span>
+                </div>
+                <div class="shield-bar-bg">
+                    <div class="shield-bar-fill" id="shieldFill"></div>
+                </div>
+            </div>
+            <div class="hud-card">
+                <span class="hud-label">Скорость</span>
+                <span class="hud-value" id="hudSpeed">1.0x</span>
+            </div>
+        </div>
+
+        <div class="hud-actions">
+            <button class="icon-btn" id="cameraBtn" title="Переключить вид камеры (C)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+            </button>
+            <button class="icon-btn" id="soundBtn" title="Включить/выключить звук (M)">
+                <svg id="iconSoundOn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                </svg>
+                <svg id="iconSoundOff" style="display:none;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <line x1="23" y1="9" x2="17" y2="15"></line>
+                    <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Баннер комбо -->
+    <div class="combo-banner" id="comboBanner">КОМБО x2</div>
+
+    <!-- Стартовый экран -->
+    <div class="overlay" id="startOverlay">
+        <div class="badge">Synthwave 3D Arcade</div>
+        <h1>NEON RUSH 3D</h1>
+        <p>Мчитесь по неоновой гипертрассе, уклоняйтесь от энергетических монолитов, перепрыгивайте барьеры и собирайте 10 кристаллов для активации защитного силового поля!</p>
+
+        <div class="controls-grid">
+            <div class="control-chip"><kbd>A</kbd> <kbd>D</kbd> / <kbd>◄</kbd> <kbd>►</kbd> Полосы</div>
+            <div class="control-chip"><kbd>Пробел</kbd> / <kbd>W</kbd> / <kbd>▲</kbd> Прыжок</div>
+            <div class="control-chip"><kbd>Свайпы</kbd> или <kbd>Клик</kbd> на экране</div>
+            <div class="control-chip"><kbd>C</kbd> Смена камеры</div>
+        </div>
+
+        <button class="cyber-btn" id="startBtn">ЗАПУСК</button>
+    </div>
+
+    <!-- Экран окончания игры -->
+    <div class="overlay hidden" id="gameOverOverlay">
+        <div class="badge">Корпус разрушен</div>
+        <h1>СБОЙ СИСТЕМЫ</h1>
+        <div class="new-record-tag" id="newRecordTag" style="display:none;">НОВЫЙ РЕКОРД!</div>
+
+        <div class="results-grid">
+            <div class="result-box">
+                <span>Итоговый счёт</span>
+                <strong id="finalScore">0</strong>
+            </div>
+            <div class="result-box">
+                <span>Дистанция</span>
+                <strong id="finalDistance" style="color: var(--neon-pink);">0 м</strong>
+            </div>
+            <div class="result-box">
+                <span>Лучший счёт</span>
+                <strong id="finalBest" style="color: var(--neon-yellow);">0</strong>
+            </div>
+        </div>
+
+        <button class="cyber-btn" id="restartBtn">ЕЩЁ РАЗ</button>
+    </div>
+
+    <div class="bottom-tip">Собирайте золотисто-бирюзовые энергосферы: 10 сфер = Энергетический щит</div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. ПРОЦЕДУРНЫЙ СИНТЕЗАТОР ЗВУКА (WEB AUDIO API)
+         * Генерирует звуки перестроения, прыжка, сбора кристаллов, щита, взрыва
+         * и фоновый пульсирующий синтвейв-бас без внешних файлов.
+         * ============================================================================
+         */
+        class SynthAudio {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.bassInterval = null;
+                this.bassStep = 0;
+                this.isPlayingMusic = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                if (this.muted) {
+                    this.stopMusic();
+                } else if (this.isPlayingMusic) {
+                    this.startMusic();
+                }
+                return this.muted;
+            }
+
+            // Универсальный генератор тона
+            playTone(freqStart, freqEnd, type, duration, gainVal = 0.15, delay = 0) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime + delay;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freqStart, now);
+                    if (freqEnd && freqEnd !== freqStart) {
+                        osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + duration);
+                    }
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(gainVal, now + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration + 0.02);
+                } catch (e) {}
+            }
+
+            // Свист при перестроении между полосами
+            playLaneSwitch(dir) {
+                const base = dir < 0 ? 280 : 340;
+                this.playTone(base, base * 1.45, 'sine', 0.11, 0.12);
+            }
+
+            // Звук антигравитационного прыжка
+            playJump() {
+                this.playTone(190, 560, 'triangle', 0.22, 0.16);
+                this.playTone(320, 740, 'sine', 0.18, 0.08, 0.03);
+            }
+
+            // Звонкий аккорд подбора кристалла с ростом тона от комбо
+            playCrystal(combo = 1) {
+                const semitoneShift = Math.min(combo, 14) * 28;
+                const f1 = 523.25 + semitoneShift; // C5+
+                const f2 = 659.25 + semitoneShift; // E5+
+                const f3 = 783.99 + semitoneShift; // G5+
+                this.playTone(f1, f1 * 1.02, 'sine', 0.18, 0.13, 0);
+                this.playTone(f2, f2 * 1.02, 'triangle', 0.2, 0.11, 0.045);
+                this.playTone(f3, f3 * 1.04, 'sine', 0.26, 0.11, 0.09);
+            }
+
+            // Активация энергетического щита
+            playShieldActivate() {
+                const notes = [330, 440, 554.37, 659.25, 880];
+                notes.forEach((n, i) => {
+                    this.playTone(n, n * 1.05, 'sawtooth', 0.25, 0.09, i * 0.055);
+                });
+            }
+
+            // Поглощение удара щитом
+            playShieldBreak() {
+                this.playTone(620, 110, 'sawtooth', 0.4, 0.22);
+                this.playTone(440, 90, 'square', 0.35, 0.15, 0.04);
+            }
+
+            // Взрыв при столкновении (белый шум + низкий бас)
+            playExplosion() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                try {
+                    const duration = 0.65;
+                    const bufferSize = this.ctx.sampleRate * duration;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.18));
+                    }
+
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(900, this.ctx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + duration);
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start();
+
+                    // Суб-бас удар
+                    this.playTone(130, 32, 'sawtooth', 0.55, 0.28);
+                } catch (e) {}
+            }
+
+            // Фоновый пульсирующий синтвейв-бас
+            startMusic() {
+                this.isPlayingMusic = true;
+                if (this.muted) return;
+                this.init();
+                this.stopMusic(false);
+
+                // Ноты арпеджио в стиле Synthwave (Ля минор / Фа мажор / До мажор / Соль мажор)
+                const bassPattern = [
+                    110.00, 110.00, 220.00, 110.00, 130.81, 130.81, 164.81, 146.83,
+                    87.31,  87.31,  174.61, 87.31,  98.00,  98.00,  196.00, 146.83
+                ];
+
+                this.bassInterval = setInterval(() => {
+                    if (this.muted || !this.isPlayingMusic) return;
+                    const freq = bassPattern[this.bassStep % bassPattern.length];
+                    this.playTone(freq, freq * 0.98, 'sawtooth', 0.14, 0.065);
+                    this.bassStep++;
+                }, 155);
+            }
+
+            stopMusic(resetFlag = true) {
+                if (resetFlag) this.isPlayingMusic = false;
+                if (this.bassInterval) {
+                    clearInterval(this.bassInterval);
+                    this.bassInterval = null;
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 2. НАСТРОЙКА THREE.JS СЦЕНЫ, ОСВЕЩЕНИЯ И НЕОНОВОГО ОКРУЖЕНИЯ
+         * ============================================================================
+         */
+        const container = document.getElementById('game-container');
+        const audio = new SynthAudio();
+
+        // Сцена с экспоненциальным киберпанк-туманом
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050612);
+        scene.fog = new THREE.FogExp2(0x07091c, 0.0145);
+
+        // Камера
+        const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 180);
+        let cameraMode = 0; // 0: Динамический вид сзади, 1: Экшен-вид ближе к трассе
+
+        // Рендерер с включёнными тенями
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Освещение сцены
+        const ambientLight = new THREE.AmbientLight(0x4f46e5, 0.65);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f3ff, 1.1);
+        dirLight.position.set(12, 24, 15);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 90;
+        const d = 18;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // Контровой розовый свет со стороны ретро-солнца
+        const sunBackLight = new THREE.PointLight(0xff007f, 2.2, 120);
+        sunBackLight.position.set(0, 18, -75);
+        scene.add(sunBackLight);
+
+        /**
+         * ============================================================================
+         * 3. СОЗДАНИЕ ТРАССЫ, РЕТРО-СОЛНЦА, ЗВЁЗД И НЕОНОВЫХ ПИЛОНОВ
+         * ============================================================================
+         */
+        const LANE_WIDTH = 3.2;
+        const LANES = [-LANE_WIDTH, 0, LANE_WIDTH];
+        const TRACK_WIDTH = LANE_WIDTH * 3 + 1.4;
+
+        // Полотно трассы
+        const roadGeo = new THREE.PlaneGeometry(TRACK_WIDTH, 240);
+        const roadMat = new THREE.MeshStandardMaterial({
+            color: 0x090d22,
+            roughness: 0.35,
+            metalness: 0.7
+        });
+        const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+        roadMesh.rotation.x = -Math.PI / 2;
+        roadMesh.position.z = -90;
+        roadMesh.receiveShadow = true;
+        scene.add(roadMesh);
+
+        // Светящиеся разделительные линии полос и края трассы
+        const linePositions = [-TRACK_WIDTH / 2, -LANE_WIDTH / 2, LANE_WIDTH / 2, TRACK_WIDTH / 2];
+        linePositions.forEach((xPos, idx) => {
+            const isEdge = idx === 0 || idx === linePositions.length - 1;
+            const lineGeo = new THREE.BoxGeometry(isEdge ? 0.22 : 0.08, 0.05, 240);
+            const lineMat = new THREE.MeshBasicMaterial({
+                color: isEdge ? 0xff007f : 0x00f3ff
+            });
+            const line = new THREE.Mesh(lineGeo, lineMat);
+            line.position.set(xPos, 0.03, -90);
+            scene.add(line);
+        });
+
+        // Движущиеся поперечные неоновые полосы сетки
+        const gridStrips = [];
+        const stripGeo = new THREE.BoxGeometry(TRACK_WIDTH, 0.03, 0.14);
+        const stripMat = new THREE.MeshBasicMaterial({ color: 0x1e3a8a });
+        for (let i = 0; i < 36; i++) {
+            const strip = new THREE.Mesh(stripGeo, stripMat);
+            strip.position.set(0, 0.02, 15 - i * 5.5);
+            scene.add(strip);
+            gridStrips.push(strip);
+        }
+
+        // Неоновые пилоны вдоль краёв дороги
+        const pylons = [];
+        const pylonGeo = new THREE.BoxGeometry(0.45, 5.2, 0.45);
+        const pylonCapGeo = new THREE.BoxGeometry(0.65, 0.35, 0.65);
+
+        for (let i = 0; i < 22; i++) {
+            const zPos = 10 - i * 9;
+            [-1, 1].forEach((side) => {
+                const group = new THREE.Group();
+                const isPink = i % 2 === 0;
+                const matBody = new THREE.MeshStandardMaterial({
+                    color: 0x0f172a,
+                    emissive: isPink ? 0x3b0764 : 0x083344,
+                    roughness: 0.3
+                });
+                const matGlow = new THREE.MeshBasicMaterial({
+                    color: isPink ? 0xff007f : 0x00f3ff
+                });
+
+                const body = new THREE.Mesh(pylonGeo, matBody);
+                body.position.y = 2.6;
+                group.add(body);
+
+                const topCap = new THREE.Mesh(pylonCapGeo, matGlow);
+                topCap.position.y = 5.3;
+                group.add(topCap);
+
+                const sideStrip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.6, 0.5), matGlow);
+                sideStrip.position.set(-side * 0.22, 2.6, 0);
+                group.add(sideStrip);
+
+                group.position.set(side * (TRACK_WIDTH / 2 + 1.6), 0, zPos);
+                scene.add(group);
+                pylons.push(group);
+            });
+        }
+
+        // Гигантское синтвейв-солнце на горизонте
+        const sunGroup = new THREE.Group();
+        const sunGeo = new THREE.CircleGeometry(28, 48);
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xff007f, fog: false });
+        const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        sunGroup.add(sunMesh);
+
+        // Тёмные горизонтальные полосы поверх солнца
+        for (let i = 0; i < 6; i++) {
+            const stripeH = 0.7 + i * 0.35;
+            const stripeGeo = new THREE.PlaneGeometry(60, stripeH);
+            const stripeMat = new THREE.MeshBasicMaterial({ color: 0x050612, fog: false });
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.position.set(0, -4 - i * 3.6, 0.1);
+            sunGroup.add(stripe);
+        }
+        sunGroup.position.set(0, 18, -145);
+        scene.add(sunGroup);
+
+        // Звёздное небо
+        const starsGeo = new THREE.BufferGeometry();
+        const starCount = 450;
+        const starPositions = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            starPositions[i * 3] = (Math.random() - 0.5) * 220;
+            starPositions[i * 3 + 1] = 12 + Math.random() * 80;
+            starPositions[i * 3 + 2] = -20 - Math.random() * 140;
+        }
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starsMat = new THREE.PointsMaterial({ color: 0x00f3ff, size: 0.45, fog: false });
+        const starField = new THREE.Points(starsGeo, starsMat);
+        scene.add(starField);
+
+        /**
+         * ============================================================================
+         * 4. СБОРКА 3D-КОРАБЛЯ / БОЛИДА ИГРОКА И СИЛОВОГО ПОЛЯ ЩИТА
+         * ============================================================================
+         */
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+
+        const shipMeshGroup = new THREE.Group();
+        playerGroup.add(shipMeshGroup);
+
+        // Основной фюзеляж (футуристичный клиновидный корпус)
+        const hullGeo = new THREE.ConeGeometry(0.95, 3.4, 6);
+        hullGeo.rotateX(-Math.PI / 2);
+        const hullMat = new THREE.MeshStandardMaterial({
+            color: 0xe2e8f0,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const hullMesh = new THREE.Mesh(hullGeo, hullMat);
+        hullMesh.scale.set(1.15, 0.52, 1);
+        hullMesh.castShadow = true;
+        shipMeshGroup.add(hullMesh);
+
+        // Кабина пилота (тонированное стекло)
+        const cockpitGeo = new THREE.SphereGeometry(0.55, 16, 12);
+        const cockpitMat = new THREE.MeshStandardMaterial({
+            color: 0x00f3ff,
+            emissive: 0x0066ff,
+            emissiveIntensity: 0.6,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+        const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+        cockpit.scale.set(0.75, 0.45, 1.6);
+        cockpit.position.set(0, 0.24, -0.15);
+        shipMeshGroup.add(cockpit);
+
+        // Стреловидные крылья с неоновой окантовкой
+        const wingGeo = new THREE.BoxGeometry(2.9, 0.12, 1.1);
+        const wingMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const wings = new THREE.Mesh(wingGeo, wingMat);
+        wings.position.set(0, -0.04, 0.55);
+        wings.castShadow = true;
+        shipMeshGroup.add(wings);
+
+        // Неоновые законцовки крыльев и кили
+        const tipGeo = new THREE.BoxGeometry(0.14, 0.48, 1.25);
+        const tipMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+        [-1.45, 1.45].forEach(xOffset => {
+            const fin = new THREE.Mesh(tipGeo, tipMat);
+            fin.position.set(xOffset, 0.14, 0.55);
+            shipMeshGroup.add(fin);
+        });
+
+        // Светящиеся сопла двигателей сзади
+        const engineGlowMat = new THREE.MeshBasicMaterial({ color: 0xff007f });
+        const engineFlames = [];
+        [-0.42, 0.42].forEach(xOffset => {
+            const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.3, 12), wingMat);
+            nozzle.rotation.x = Math.PI / 2;
+            nozzle.position.set(xOffset, 0, 1.6);
+            shipMeshGroup.add(nozzle);
+
+            const flameGeo = new THREE.ConeGeometry(0.19, 1.1, 12);
+            flameGeo.rotateX(Math.PI / 2);
+            const flame = new THREE.Mesh(flameGeo, engineGlowMat);
+            flame.position.set(xOffset, 0, 2.2);
+            shipMeshGroup.add(flame);
+            engineFlames.push(flame);
+        });
+
+        // Подсветка под днищем корабля
+        const shipUnderLight = new THREE.PointLight(0x00f3ff, 1.8, 7);
+        shipUnderLight.position.set(0, 0.3, 0);
+        playerGroup.add(shipUnderLight);
+
+        // Визуальная 3D-сфера энергетического щита вокруг корабля
+        const shieldGeo = new THREE.SphereGeometry(2.05, 24, 20);
+        const shieldMat = new THREE.MeshBasicMaterial({
+            color: 0x00f59b,
+            transparent: true,
+            opacity: 0.24,
+            wireframe: false,
+            depthWrite: false
+        });
+        const shieldSphere = new THREE.Mesh(shieldGeo, shieldMat);
+        shieldSphere.visible = false;
+
+        // Внешний каркас сетки щита
+        const shieldWireMat = new THREE.MeshBasicMaterial({
+            color: 0x00f3ff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.25
+        });
+        const shieldWire = new THREE.Mesh(new THREE.SphereGeometry(2.08, 14, 12), shieldWireMat);
+        shieldSphere.add(shieldWire);
+        playerGroup.add(shieldSphere);
+
+        /**
+         * ============================================================================
+         * 5. ИГРОВЫЕ ПЕРЕМЕННЫЕ, ПРЕПЯТСТВИЯ, КРИСТАЛЛЫ И ЧАСТИЦЫ
+         * ============================================================================
+         */
+        let gameActive = false;
+        let score = 0;
+        let distance = 0;
+        let highScore = parseInt(localStorage.getItem('neon_rush_3d_best') || '0', 10);
+
+        // Параметры движения и физики игрока
+        let currentLane = 1; // 0 = левая, 1 = центр, 2 = правая
+        let playerY = 0.75;
+        let velocityY = 0;
+        let isGrounded = true;
+        const BASE_Y = 0.75;
+        const GRAVITY = -46;
+        const JUMP_IMPULSE = 17.8;
+
+        // Скорость трассы и сложность
+        let speed = 34;
+        const BASE_SPEED = 34;
+        const MAX_SPEED = 84;
+        let spawnTimer = 0;
+
+        // Система кристаллов, комбо и щита
+        let crystalCharge = 0;
+        const SHIELD_MAX_CHARGE = 10;
+        let hasShield = false;
+        let combo = 0;
+        let comboTimer = 0;
+
+        // Массивы динамических объектов
+        const obstacles = [];
+        const crystals = [];
+        const particles = [];
+
+        // Общие геометрии и материалы для производительности
+        const lowBarrierGeo = new THREE.BoxGeometry(2.5, 1.05, 0.85);
+        const lowBarrierMat = new THREE.MeshStandardMaterial({
+            color: 0xff5400,
+            emissive: 0xff2a00,
+            emissiveIntensity: 0.55,
+            roughness: 0.25
+        });
+
+        const highMonolithGeo = new THREE.BoxGeometry(2.35, 4.2, 1.15);
+        const highMonolithMat = new THREE.MeshStandardMaterial({
+            color: 0xff0055,
+            emissive: 0x990033,
+            emissiveIntensity: 0.65,
+            metalness: 0.6,
+            roughness: 0.2
+        });
+
+        const crystalGeo = new THREE.OctahedronGeometry(0.68, 0);
+        const crystalMat = new THREE.MeshStandardMaterial({
+            color: 0x00f3ff,
+            emissive: 0xffbe0b,
+            emissiveIntensity: 0.55,
+            metalness: 0.85,
+            roughness: 0.1
+        });
+
+        // Ссылки на элементы HUD
+        const hudScore = document.getElementById('hudScore');
+        const hudDistance = document.getElementById('hudDistance');
+        const hudHighScore = document.getElementById('hudHighScore');
+        const hudSpeed = document.getElementById('hudSpeed');
+        const shieldText = document.getElementById('shieldText');
+        const shieldFill = document.getElementById('shieldFill');
+        const comboBanner = document.getElementById('comboBanner');
+
+        const startOverlay = document.getElementById('startOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+        hudHighScore.textContent = highScore;
+
+        /**
+         * Создание частиц (шлейф двигателя, искры кристаллов, взрыв)
+         */
+        const particleGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+        function spawnParticles(pos, colorHex, count = 15, speedScale = 1) {
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.position.copy(pos);
+                scene.add(mesh);
+
+                particles.push({
+                    mesh,
+                    vx: (Math.random() - 0.5) * 12 * speedScale,
+                    vy: (Math.random() * 8 + 2) * speedScale,
+                    vz: (Math.random() - 0.5) * 12 * speedScale,
+                    life: 0.5 + Math.random() * 0.45,
+                    maxLife: 0.95
+                });
+            }
+        }
+
+        /**
+         * Генерация волны препятствий и кристаллов впереди на трассе
+         */
+        function spawnRow() {
+            const zSpawn = -135;
+            // Выбираем, сколько полос заблокировать (1 или 2, всегда оставляя проход)
+            const difficultyRatio = Math.min((speed - BASE_SPEED) / (MAX_SPEED - BASE_SPEED), 1);
+            const blockTwoLanes = Math.random() < (0.35 + difficultyRatio * 0.38);
+
+            const availableLanes = [0, 1, 2];
+            // Перемешиваем полосы
+            for (let i = availableLanes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableLanes[i], availableLanes[j]] = [availableLanes[j], availableLanes[i]];
+            }
+
+            const blockedCount = blockTwoLanes ? 2 : 1;
+            const blockedLanes = availableLanes.slice(0, blockedCount);
+            const freeLanes = availableLanes.slice(blockedCount);
+
+            // Создаём препятствия на заблокированных полосах
+            blockedLanes.forEach(laneIdx => {
+                // 45% шанс низкого барьера (можно перепрыгнуть), 55% — высокий монолит
+                const isLow = Math.random() < 0.45;
+                const group = new THREE.Group();
+
+                if (isLow) {
+                    const mesh = new THREE.Mesh(lowBarrierGeo, lowBarrierMat);
+                    mesh.position.y = 0.55;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    group.add(mesh);
+
+                    // Верхняя светящаяся полоса на барьере
+                    const trim = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.55, 0.14, 0.9),
+                        new THREE.MeshBasicMaterial({ color: 0xffbe0b })
+                    );
+                    trim.position.y = 1.08;
+                    group.add(trim);
+                } else {
+                    const mesh = new THREE.Mesh(highMonolithGeo, highMonolithMat);
+                    mesh.position.y = 2.1;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    group.add(mesh);
+
+                    // Вертикальные неоновые рёбра на монолите
+                    const edge = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.42, 4.25, 0.2),
+                        new THREE.MeshBasicMaterial({ color: 0xff007f })
+                    );
+                    edge.position.set(0, 2.1, 0.5);
+                    group.add(edge);
+                }
+
+                group.position.set(LANES[laneIdx], 0, zSpawn);
+                scene.add(group);
+
+                obstacles.push({
+                    mesh: group,
+                    lane: laneIdx,
+                    isLow: isLow,
+                    height: isLow ? 1.15 : 4.2,
+                    passed: false
+                });
+            });
+
+            // Размещаем цепочку или одиночный кристалл на свободной полосе (или над низким барьером)
+            if (Math.random() < 0.78) {
+                const targetLane = freeLanes[0];
+                const count = Math.random() < 0.4 ? 3 : 1;
+                for (let c = 0; c < count; c++) {
+                    const cGroup = new THREE.Group();
+                    const core = new THREE.Mesh(crystalGeo, crystalMat);
+                    cGroup.add(core);
+
+                    // Внешнее кольцо вокруг кристалла
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.92, 0.05, 8, 24),
+                        new THREE.MeshBasicMaterial({ color: 0xffbe0b })
+                    );
+                    cGroup.add(ring);
+
+                    cGroup.position.set(LANES[targetLane], 1.15, zSpawn - c * 4.2);
+                    scene.add(cGroup);
+
+                    crystals.push({
+                        mesh: cGroup,
+                        ring: ring,
+                        lane: targetLane
+                    });
+                }
+            }
+        }
+
+        /**
+         * Управление перестроением и прыжком
+         */
+        function moveLeft() {
+            if (!gameActive) return;
+            if (currentLane > 0) {
+                currentLane--;
+                audio.playLaneSwitch(-1);
+            }
+        }
+
+        function moveRight() {
+            if (!gameActive) return;
+            if (currentLane < 2) {
+                currentLane++;
+                audio.playLaneSwitch(1);
+            }
+        }
+
+        function jump() {
+            if (!gameActive) return;
+            if (isGrounded) {
+                velocityY = JUMP_IMPULSE;
+                isGrounded = false;
+                audio.playJump();
+                spawnParticles(
+                    new THREE.Vector3(playerGroup.position.x, 0.2, playerGroup.position.z + 0.8),
+                    0x00f3ff,
+                    10,
+                    0.6
+                );
+            }
+        }
+
+        /**
+         * Обновление HUD интерфейса
+         */
+        function updateHUD() {
+            hudScore.textContent = Math.floor(score);
+            hudDistance.textContent = `${Math.floor(distance)} м`;
+            hudSpeed.textContent = `${(speed / BASE_SPEED).toFixed(1)}x`;
+
+            if (score > highScore) {
+                highScore = Math.floor(score);
+                hudHighScore.textContent = highScore;
+            }
+
+            if (hasShield) {
+                shieldText.textContent = 'АКТИВЕН';
+                shieldText.style.color = '#00f59b';
+                shieldFill.style.width = '100%';
+                shieldFill.classList.add('active');
+            } else {
+                shieldText.textContent = `${crystalCharge} / ${SHIELD_MAX_CHARGE}`;
+                shieldText.style.color = '#00f3ff';
+                shieldFill.style.width = `${(crystalCharge / SHIELD_MAX_CHARGE) * 100}%`;
+                shieldFill.classList.remove('active');
+            }
+
+            if (combo > 1) {
+                comboBanner.textContent = `КОМБО x${combo}`;
+                comboBanner.classList.add('visible');
+            } else {
+                comboBanner.classList.remove('visible');
+            }
+        }
+
+        /**
+         * Запуск новой игровой сессии
+         */
+        function startGame() {
+            audio.init();
+            audio.startMusic();
+
+            // Очистка старых объектов
+            obstacles.forEach(o => scene.remove(o.mesh));
+            obstacles.length = 0;
+
+            crystals.forEach(c => scene.remove(c.mesh));
+            crystals.length = 0;
+
+            particles.forEach(p => scene.remove(p.mesh));
+            particles.length = 0;
+
+            // Сброс параметров
+            score = 0;
+            distance = 0;
+            speed = BASE_SPEED;
+            currentLane = 1;
+            playerY = BASE_Y;
+            velocityY = 0;
+            isGrounded = true;
+
+            crystalCharge = 0;
+            hasShield = false;
+            shieldSphere.visible = false;
+
+            combo = 0;
+            comboTimer = 0;
+            spawnTimer = 0.4;
+
+            playerGroup.visible = true;
+            playerGroup.position.set(0, BASE_Y, 0);
+            shipMeshGroup.rotation.set(0, 0, 0);
+
+            startOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+
+            gameActive = true;
+            updateHUD();
+        }
+
+        /**
+         * Завершение игры при фатальном столкновении
+         */
+        function triggerGameOver() {
+            gameActive = false;
+            audio.stopMusic();
+            audio.playExplosion();
+
+            // Взрыв корабля
+            spawnParticles(playerGroup.position, 0xff007f, 38, 1.8);
+            spawnParticles(playerGroup.position, 0x00f3ff, 26, 1.5);
+            playerGroup.visible = false;
+            screenShake = 0.85;
+
+            const finalScoreVal = Math.floor(score);
+            const savedBest = parseInt(localStorage.getItem('neon_rush_3d_best') || '0', 10);
+            const isRecord = finalScoreVal > savedBest && finalScoreVal > 0;
+
+            if (isRecord) {
+                localStorage.setItem('neon_rush_3d_best', finalScoreVal.toString());
+                highScore = finalScoreVal;
+            }
+
+            document.getElementById('finalScore').textContent = finalScoreVal;
+            document.getElementById('finalDistance').textContent = `${Math.floor(distance)} м`;
+            document.getElementById('finalBest').textContent = highScore;
+            document.getElementById('newRecordTag').style.display = isRecord ? 'inline-block' : 'none';
+
+            setTimeout(() => {
+                gameOverOverlay.classList.remove('hidden');
+            }, 550);
+        }
+
+        /**
+         * ============================================================================
+         * 6. ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ И РЕНДЕРИНГА (60+ FPS)
+         * ============================================================================
+         */
+        let lastTime = performance.now();
+        let screenShake = 0;
+        let trailAccumulator = 0;
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+            const timeSec = now * 0.001;
+
+            // Анимация пульсации пламени двигателей
+            engineFlames.forEach((flame, idx) => {
+                const flicker = 0.85 + Math.sin(timeSec * 45 + idx) * 0.25;
+                flame.scale.set(1, 1, flicker);
+            });
+
+            // Вращение щита вокруг корабля
+            if (shieldSphere.visible) {
+                shieldSphere.rotation.y += dt * 1.8;
+                shieldSphere.rotation.x += dt * 0.9;
+                const pulse = 1 + Math.sin(timeSec * 6) * 0.035;
+                shieldSphere.scale.set(pulse, pulse, pulse);
+            }
+
+            // Плавное движение сетки и пилонов (даже на стартовом экране для красоты)
+            const visualSpeed = gameActive ? speed : 16;
+
+            gridStrips.forEach(strip => {
+                strip.position.z += visualSpeed * dt;
+                if (strip.position.z > 16) {
+                    strip.position.z -= 36 * 5.5;
+                }
+            });
+
+            pylons.forEach(pylon => {
+                pylon.position.z += visualSpeed * dt;
+                if (pylon.position.z > 16) {
+                    pylon.position.z -= 22 * 9;
+                }
+            });
+
+            // Логика активной игры
+            if (gameActive) {
+                // Постепенное ускорение и начисление дистанции/очков
+                speed = Math.min(MAX_SPEED, speed + dt * 0.95);
+                const stepDist = speed * dt * 1.4;
+                distance += stepDist;
+                score += stepDist * (1 + combo * 0.1);
+
+                // Таймер комбо
+                if (combo > 0) {
+                    comboTimer -= dt;
+                    if (comboTimer <= 0) {
+                        combo = 0;
+                    }
+                }
+
+                // Плавное перемещение корабля к целевой полосе и наклон корпуса (Roll)
+                const targetX = LANES[currentLane];
+                const diffX = targetX - playerGroup.position.x;
+                playerGroup.position.x += diffX * Math.min(1, dt * 15);
+
+                const targetRoll = -diffX * 0.34;
+                shipMeshGroup.rotation.z += (targetRoll - shipMeshGroup.rotation.z) * Math.min(1, dt * 14);
+
+                // Физика прыжка и наклон носа (Pitch)
+                if (!isGrounded) {
+                    velocityY += GRAVITY * dt;
+                    playerY += velocityY * dt;
+                    if (playerY <= BASE_Y) {
+                        playerY = BASE_Y;
+                        velocityY = 0;
+                        isGrounded = true;
+                    }
+                }
+                const hoverOffset = isGrounded ? Math.sin(timeSec * 7) * 0.07 : 0;
+                playerGroup.position.y = playerY + hoverOffset;
+
+                const targetPitch = isGrounded ? 0 : velocityY * 0.025;
+                shipMeshGroup.rotation.x += (targetPitch - shipMeshGroup.rotation.x) * Math.min(1, dt * 12);
+
+                // Частицы шлейфа из двигателя
+                trailAccumulator += dt;
+                if (trailAccumulator > 0.035) {
+                    trailAccumulator = 0;
+                    spawnParticles(
+                        new THREE.Vector3(
+                            playerGroup.position.x + (Math.random() - 0.5) * 0.6,
+                            playerGroup.position.y - 0.05,
+                            playerGroup.position.z + 2.1
+                        ),
+                        hasShield ? 0x00f59b : 0xff007f,
+                        1,
+                        0.25
+                    );
+                }
+
+                // Генерация новых препятствий
+                spawnTimer -= dt;
+                if (spawnTimer <= 0) {
+                    spawnRow();
+                    // Интервал между волнами сокращается с ростом скорости
+                    spawnTimer = Math.max(0.46, 26 / speed);
+                }
+
+                // Обновление и проверка столкновений с препятствиями
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const obs = obstacles[i];
+                    obs.mesh.position.z += speed * dt;
+
+                    const dz = Math.abs(obs.mesh.position.z - playerGroup.position.z);
+                    const dx = Math.abs(obs.mesh.position.x - playerGroup.position.x);
+
+                    // Проверка коллизии AABB
+                    if (dz < 1.55 && dx < 1.35) {
+                        const shipBottom = playerGroup.position.y - 0.35;
+                        if (shipBottom < obs.height) {
+                            if (hasShield) {
+                                // Щит поглощает удар и разрушает препятствие
+                                hasShield = false;
+                                crystalCharge = 0;
+                                shieldSphere.visible = false;
+                                screenShake = 0.55;
+                                audio.playShieldBreak();
+                                spawnParticles(obs.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x00f59b, 28, 1.4);
+                                scene.remove(obs.mesh);
+                                obstacles.splice(i, 1);
+                                updateHUD();
+                                continue;
+                            } else {
+                                triggerGameOver();
+                                break;
+                            }
+                        }
+                    }
+
+                    // Удаление ушедших за камеру препятствий
+                    if (obs.mesh.position.z > 14) {
+                        scene.remove(obs.mesh);
+                        obstacles.splice(i, 1);
+                    }
+                }
+
+                // Обновление и сбор энергетических кристаллов
+                for (let i = crystals.length - 1; i >= 0; i--) {
+                    const cr = crystals[i];
+                    cr.mesh.position.z += speed * dt;
+                    cr.mesh.rotation.y += dt * 3.2;
+                    cr.ring.rotation.x += dt * 4.5;
+
+                    const dz = Math.abs(cr.mesh.position.z - playerGroup.position.z);
+                    const dx = Math.abs(cr.mesh.position.x - playerGroup.position.x);
+                    const dy = Math.abs(cr.mesh.position.y - playerGroup.position.y);
+
+                    if (dz < 1.75 && dx < 1.45 && dy < 1.8) {
+                        combo++;
+                        comboTimer = 2.6;
+                        score += 100 * combo;
+
+                        spawnParticles(cr.mesh.position, 0xffbe0b, 14, 0.8);
+                        audio.playCrystal(combo);
+
+                        if (!hasShield) {
+                            crystalCharge++;
+                            if (crystalCharge >= SHIELD_MAX_CHARGE) {
+                                hasShield = true;
+                                shieldSphere.visible = true;
+                                audio.playShieldActivate();
+                                spawnParticles(playerGroup.position, 0x00f59b, 24, 1.1);
+                            }
+                        } else {
+                            score += 150; // Бонусные очки, если щит уже заряжен
+                        }
+
+                        scene.remove(cr.mesh);
+                        crystals.splice(i, 1);
+                        updateHUD();
+                        continue;
+                    }
+
+                    if (cr.mesh.position.z > 14) {
+                        scene.remove(cr.mesh);
+                        crystals.splice(i, 1);
+                    }
+                }
+
+                updateHUD();
+            }
+
+            // Обновление всех частиц
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.position.y += p.vy * dt;
+                p.mesh.position.z += p.vz * dt;
+                p.vy -= 18 * dt;
+                const scale = Math.max(0.01, p.life / p.maxLife);
+                p.mesh.scale.set(scale, scale, scale);
+            }
+
+            // Позиционирование камеры (динамическое следование + тряска при взрыве)
+            const camTargetX = playerGroup.position.x * 0.55;
+            const camTargetY = cameraMode === 0 ? 4.3 + (playerGroup.position.y - BASE_Y) * 0.35 : 2.5 + (playerGroup.position.y - BASE_Y) * 0.45;
+            const camTargetZ = cameraMode === 0 ? 8.2 : 5.4;
+
+            camera.position.x += (camTargetX - camera.position.x) * Math.min(1, dt * 8);
+            camera.position.y += (camTargetY - camera.position.y) * Math.min(1, dt * 8);
+            camera.position.z += (camTargetZ - camera.position.z) * Math.min(1, dt * 8);
+
+            if (screenShake > 0) {
+                camera.position.x += (Math.random() - 0.5) * screenShake;
+                camera.position.y += (Math.random() - 0.5) * screenShake;
+                screenShake *= 0.88;
+                if (screenShake < 0.02) screenShake = 0;
+            }
+
+            camera.lookAt(playerGroup.position.x * 0.35, 1.4, -18);
+
+            renderer.render(scene, camera);
+        }
+
+        /**
+         * ============================================================================
+         * 7. ОБРАБОТЧИКИ ВВОДА (КЛАВИАТУРА, СВАЙПЫ, КЛИКИ, КНОПКИ)
+         * ============================================================================
+         */
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                moveLeft();
+            } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                moveRight();
+            } else if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                if (!gameActive) {
+                    e.preventDefault();
+                    startGame();
+                } else {
+                    e.preventDefault();
+                    jump();
+                }
+            } else if (e.code === 'Enter' && !gameActive) {
+                startGame();
+            } else if (e.code === 'KeyC') {
+                cameraMode = (cameraMode + 1) % 2;
+            } else if (e.code === 'KeyM') {
+                toggleSoundUI();
+            }
+        });
+
+        // Сенсорное управление (свайпы влево, вправо, вверх и тап)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchHandled = false;
+
+        window.addEventListener('touchstart', (e) => {
+            if (!gameActive) return;
+            if (e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchHandled = false;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!gameActive || touchHandled || e.touches.length === 0) return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+
+            if (Math.abs(dx) > 28 || Math.abs(dy) > 28) {
+                touchHandled = true;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    if (dx < 0) moveLeft();
+                    else moveRight();
+                } else if (dy < 0) {
+                    jump();
+                }
+            }
+        }, { passive: true });
+
+        // Клик мышью по левой/правой половине экрана во время игры
+        renderer.domElement.addEventListener('mousedown', (e) => {
+            if (!gameActive) return;
+            if (e.clientX < window.innerWidth / 2) {
+                moveLeft();
+            } else {
+                moveRight();
+            }
+        });
+
+        // Кнопки интерфейса
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        document.getElementById('cameraBtn').addEventListener('click', () => {
+            cameraMode = (cameraMode + 1) % 2;
+        });
+
+        function toggleSoundUI() {
+            const isMuted = audio.toggleMute();
+            const soundBtn = document.getElementById('soundBtn');
+            soundBtn.classList.toggle('muted', isMuted);
+            document.getElementById('iconSoundOn').style.display = isMuted ? 'none' : 'block';
+            document.getElementById('iconSoundOff').style.display = isMuted ? 'block' : 'none';
+        }
+
+        document.getElementById('soundBtn').addEventListener('click', toggleSoundUI);
+
+        // Адаптация при изменении размера окна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Запуск главного цикла после полной загрузки окна
+        window.onload = function () {
+            animate(performance.now());
+        };
+    </script>
+</body>
+</html>

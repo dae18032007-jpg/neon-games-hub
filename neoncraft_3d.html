@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEONCRAFT 3D | Неоновый воксельный мир</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #04060e;
+            --panel-bg: rgba(10, 15, 32, 0.78);
+            --panel-border: rgba(0, 243, 255, 0.25);
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff007f;
+            --neon-purple: #b517ff;
+            --neon-lime: #39ff14;
+            --neon-amber: #ffbe0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-main);
+        }
+
+        /* 3D холст */
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        /* Режим контрастной подсветки / усиленного неона */
+        body.high-contrast #game-canvas {
+            filter: contrast(1.18) saturate(1.25) brightness(1.06);
+        }
+
+        body.high-contrast .hud-panel,
+        body.high-contrast .hotbar-slot,
+        body.high-contrast .help-modal {
+            border-color: rgba(0, 243, 255, 0.55);
+            box-shadow: 0 0 22px rgba(0, 243, 255, 0.16);
+        }
+
+        /* Верхняя компактная панель управления */
+        .top-bar {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            z-index: 15;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .hud-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 6px 10px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            pointer-events: auto;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        }
+
+        .brand-tag {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            padding: 4px 10px 4px 4px;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: var(--text-main);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.16s ease;
+            white-space: nowrap;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 243, 255, 0.14);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(1px);
+        }
+
+        .action-btn.active {
+            background: rgba(255, 0, 127, 0.2);
+            border-color: var(--neon-pink);
+            color: #ff80bf;
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.3);
+        }
+
+        .action-btn.muted {
+            color: #fb7185;
+            border-color: rgba(251, 113, 133, 0.4);
+        }
+
+        .coords-badge {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            color: var(--neon-cyan);
+            padding: 4px 8px;
+            background: rgba(4, 6, 14, 0.65);
+            border-radius: 7px;
+            border: 1px solid rgba(0, 243, 255, 0.16);
+        }
+
+        /* Прицел по центру экрана */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 22px;
+            height: 22px;
+            transform: translate(-50%, -50%);
+            z-index: 12;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 243, 255, 0.9);
+            box-shadow: 0 0 8px var(--neon-cyan);
+            border-radius: 2px;
+        }
+
+        .crosshair::before {
+            width: 16px;
+            height: 2px;
+        }
+
+        .crosshair::after {
+            width: 2px;
+            height: 16px;
+        }
+
+        .crosshair-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--neon-pink);
+            box-shadow: 0 0 6px var(--neon-pink);
+        }
+
+        /* Компактная подсказка управления над хотбаром */
+        .bottom-hint {
+            position: fixed;
+            bottom: 86px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            pointer-events: none;
+            background: rgba(6, 9, 20, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 99px;
+            padding: 4px 14px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            backdrop-filter: blur(6px);
+        }
+
+        .bottom-hint span {
+            color: var(--neon-cyan);
+            font-weight: 700;
+        }
+
+        /* Хотбар выбора неоновых блоков снизу */
+        .hotbar-wrapper {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            display: flex;
+            gap: 8px;
+            padding: 7px 10px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            max-width: 96vw;
+            overflow-x: auto;
+        }
+
+        .hotbar-slot {
+            position: relative;
+            width: 58px;
+            height: 58px;
+            border-radius: 11px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .hotbar-slot:hover {
+            border-color: rgba(0, 243, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .hotbar-slot.selected {
+            border-color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.14);
+            transform: translateY(-4px);
+            box-shadow: 0 0 18px rgba(0, 243, 255, 0.45);
+        }
+
+        .slot-key {
+            position: absolute;
+            top: 3px;
+            left: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .block-swatch {
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            border: 1.5px solid rgba(255, 255, 255, 0.75);
+        }
+
+        .slot-name {
+            font-size: 0.58rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 52px;
+        }
+
+        /* Уведомление-тост */
+        .toast {
+            position: fixed;
+            top: 66px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-16px);
+            z-index: 25;
+            background: rgba(10, 15, 32, 0.92);
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.35);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Модальное окно краткой справки */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            background: rgba(4, 6, 14, 0.72);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-backdrop.hidden {
+            display: none;
+        }
+
+        .help-modal {
+            width: 100%;
+            max-width: 520px;
+            background: rgba(11, 16, 36, 0.95);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 243, 255, 0.15);
+        }
+
+        .help-modal h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--neon-cyan);
+            margin-bottom: 12px;
+        }
+
+        .help-list {
+            list-style: none;
+            display: grid;
+            gap: 8px;
+            font-size: 0.84rem;
+            color: #cbd5e1;
+            margin-bottom: 18px;
+        }
+
+        .help-list li strong {
+            color: #ffffff;
+        }
+
+        .help-list kbd {
+            background: rgba(0, 243, 255, 0.14);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            color: var(--neon-cyan);
+            padding: 1px 6px;
+            border-radius: 5px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.72rem;
+        }
+
+        @media (max-width: 720px) {
+            .bottom-hint {
+                display: none;
+            }
+            .hotbar-slot {
+                width: 50px;
+                height: 52px;
+            }
+            .coords-badge {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Прицел по центру -->
+    <div class="crosshair" aria-hidden="true">
+        <div class="crosshair-dot"></div>
+    </div>
+
+    <!-- Компактная верхняя панель действий -->
+    <header class="top-bar">
+        <div class="hud-panel">
+            <span class="brand-tag">NEONCRAFT 3D</span>
+            <button class="action-btn" id="newWorldBtn" title="Сгенерировать новый мир">Новый мир</button>
+            <button class="action-btn" id="saveWorldBtn" title="Сохранить постройки в браузере">Сохранить</button>
+            <button class="action-btn" id="loadWorldBtn" title="Загрузить сохранённый мир">Загрузить</button>
+            <button class="action-btn" id="resetPosBtn" title="Вернуть игрока в центр над поверхностью">Сброс позиции</button>
+        </div>
+
+        <div class="hud-panel">
+            <span class="coords-badge" id="coordsBadge">X: 0 Y: 8 Z: 0</span>
+            <button class="action-btn" id="glowToggleBtn" title="Переключить режим подсветки и контраста">Свечение: Вкл</button>
+            <button class="action-btn" id="soundToggleBtn" title="Звуковые эффекты (Web Audio API)">Звук: Вкл</button>
+            <button class="action-btn" id="helpBtn" title="Справка по управлению">Справка</button>
+        </div>
+    </header>
+
+    <!-- Краткая подсказка без захвата всего экрана -->
+    <div class="bottom-hint">
+        <span>WASD</span> движение &bull; <span>Space</span> прыжок &bull; <span>ЛКМ</span> поставить &bull; <span>ПКМ / Shift+ЛКМ</span> сломать &bull; <span>1–6</span> блоки
+    </div>
+
+    <!-- Хотбар с 6 типами неоновых блоков -->
+    <nav class="hotbar-wrapper" id="hotbar" aria-label="Выбор неоновых блоков"></nav>
+
+    <!-- Тост уведомлений -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Модальное окно справки -->
+    <div class="modal-backdrop hidden" id="helpModal">
+        <div class="help-modal">
+            <h2>Управление и механики NEONCRAFT 3D</h2>
+            <ul class="help-list">
+                <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> или <kbd>◄</kbd><kbd>▲</kbd><kbd>▼</kbd><kbd>►</kbd> — ходьба от первого лица.</li>
+                <li><kbd>Space</kbd> — прыжок (удерживайте для повторного прыжка при приземлении).</li>
+                <li><strong>Осмотр:</strong> кликните по миру для захвата курсора (Pointer Lock). Если захват заблокирован в окне/фрейме — <strong>перетаскивайте мышью/пальцем</strong> или используйте <kbd>Q</kbd>/<kbd>E</kbd> для поворота камеры.</li>
+                <li><kbd>ЛКМ</kbd> — установить выбранный неоновый блок на подсвеченную грань.</li>
+                <li><kbd>ПКМ</kbd> или <kbd>Shift</kbd> + <kbd>ЛКМ</kbd> — разрушить блок под прицелом.</li>
+                <li><kbd>1</kbd>–<kbd>6</kbd> или <strong>колёсико мыши</strong> — выбор блока в хотбаре.</li>
+                <li><strong>Сохранение:</strong> кнопки <em>Сохранить</em> и <em>Загрузить</em> записывают мир в <code>localStorage</code> браузера.</li>
+            </ul>
+            <button class="action-btn active" id="closeHelpBtn" style="padding: 9px 18px; font-size: 0.8rem;">Понятно, продолжить</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. СИНТЕЗАТОР ЗВУКОВ НА WEB AUDIO API
+         * ============================================================================
+         */
+        class NeonSoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            ensureContext() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume().catch(() => {});
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            playTone(freqStart, freqEnd, type, duration, volume = 0.12) {
+                if (this.muted) return;
+                this.ensureContext();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freqStart, now);
+                    if (freqEnd && freqEnd !== freqStart) {
+                        osc.frequency.exponentialRampToValueAtTime(Math.max(25, freqEnd), now + duration);
+                    }
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+                    gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration + 0.02);
+                } catch (_) {}
+            }
+
+            uiClick() {
+                this.playTone(620, 880, 'sine', 0.06, 0.07);
+            }
+
+            jump() {
+                this.playTone(185, 490, 'triangle', 0.18, 0.13);
+            }
+
+            placeBlock(pitchFactor = 1) {
+                this.playTone(260 * pitchFactor, 520 * pitchFactor, 'triangle', 0.11, 0.14);
+            }
+
+            breakBlock(pitchFactor = 1) {
+                this.playTone(380 * pitchFactor, 110 * pitchFactor, 'sawtooth', 0.16, 0.14);
+                this.playTone(190, 75, 'square', 0.12, 0.08);
+            }
+        }
+
+        const sound = new NeonSoundEngine();
+
+        /**
+         * ============================================================================
+         * 2. КАТАЛОГ НЕОНОВЫХ БЛОКОВ И ГЕНЕРАЦИЯ ПРОЦЕДУРНЫХ ТЕКСТУР
+         * ============================================================================
+         */
+        const BLOCK_TYPES = [
+            {
+                id: 1,
+                key: '1',
+                name: 'Кибер-трава',
+                color: '#39ff14',
+                topColor: '#39ff14',
+                sideColor: '#0f291e',
+                emissive: 0x125c1e,
+                edgeColor: 0x39ff14,
+                transparent: false,
+                pitch: 1.0
+            },
+            {
+                id: 2,
+                key: '2',
+                name: 'Неон-камень',
+                color: '#00f3ff',
+                topColor: '#00f3ff',
+                sideColor: '#0b2239',
+                emissive: 0x073b5c,
+                edgeColor: 0x00f3ff,
+                transparent: false,
+                pitch: 0.92
+            },
+            {
+                id: 3,
+                key: '3',
+                name: 'Кристалл',
+                color: '#b517ff',
+                topColor: '#d966ff',
+                sideColor: '#3b0764',
+                emissive: 0x4c0d82,
+                edgeColor: 0xe066ff,
+                transparent: false,
+                pitch: 1.25
+            },
+            {
+                id: 4,
+                key: '4',
+                name: 'Энергоблок',
+                color: '#76ff03',
+                topColor: '#b2ff59',
+                sideColor: '#1b4332',
+                emissive: 0x2b6e12,
+                edgeColor: 0xaaff00,
+                transparent: false,
+                pitch: 1.12
+            },
+            {
+                id: 5,
+                key: '5',
+                name: 'Маяк',
+                color: '#ffbe0b',
+                topColor: '#ffd166',
+                sideColor: '#422006',
+                emissive: 0x664100,
+                edgeColor: 0xffbe0b,
+                transparent: false,
+                pitch: 1.35
+            },
+            {
+                id: 6,
+                key: '6',
+                name: 'Стекло-сетка',
+                color: '#ff007f',
+                topColor: '#ff4da6',
+                sideColor: '#380822',
+                emissive: 0x520029,
+                edgeColor: 0xff2a9d,
+                transparent: true,
+                pitch: 1.45
+            }
+        ];
+
+        const BLOCK_MAP = new Map(BLOCK_TYPES.map(b => [b.id, b]));
+
+        // Генерация текстуры неоновой грани с сеткой и рамкой
+        function createNeonBlockTexture(baseHex, gridHex, isGlass = false) {
+            const texCanvas = document.createElement('canvas');
+            texCanvas.width = 128;
+            texCanvas.height = 128;
+            const g = texCanvas.getContext('2d');
+
+            g.fillStyle = baseHex;
+            g.fillRect(0, 0, 128, 128);
+
+            // Внутренняя сетка
+            g.strokeStyle = gridHex;
+            g.lineWidth = isGlass ? 3 : 2;
+            g.globalAlpha = isGlass ? 0.55 : 0.28;
+            for (let p = 32; p < 128; p += 32) {
+                g.beginPath();
+                g.moveTo(p, 0);
+                g.lineTo(p, 128);
+                g.stroke();
+
+                g.beginPath();
+                g.moveTo(0, p);
+                g.lineTo(128, p);
+                g.stroke();
+            }
+
+            // Светящаяся рамка по краю грани
+            g.globalAlpha = 0.95;
+            g.strokeStyle = gridHex;
+            g.lineWidth = 8;
+            g.strokeRect(4, 4, 120, 120);
+
+            const texture = new THREE.CanvasTexture(texCanvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.LinearMipmapLinearFilter;
+            return texture;
+        }
+
+        // Подготавливаем материалы и геометрию рёбер для каждого типа блока
+        const BLOCK_SIZE = 1;
+        const boxGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        const edgesGeometry = new THREE.EdgesGeometry(boxGeometry);
+
+        const blockMaterialsByType = new Map();
+        const edgeMaterialsByType = new Map();
+
+        BLOCK_TYPES.forEach(def => {
+            const sideTex = createNeonBlockTexture(def.sideColor, def.color, def.transparent);
+            const topTex = createNeonBlockTexture(def.topColor, '#ffffff', def.transparent);
+
+            const sideMat = new THREE.MeshStandardMaterial({
+                map: sideTex,
+                emissive: def.emissive,
+                emissiveIntensity: 0.72,
+                roughness: def.transparent ? 0.15 : 0.35,
+                metalness: def.transparent ? 0.8 : 0.45,
+                transparent: def.transparent,
+                opacity: def.transparent ? 0.52 : 1.0
+            });
+
+            const topMat = new THREE.MeshStandardMaterial({
+                map: topTex,
+                emissive: def.emissive,
+                emissiveIntensity: 0.85,
+                roughness: 0.25,
+                metalness: 0.5,
+                transparent: def.transparent,
+                opacity: def.transparent ? 0.62 : 1.0
+            });
+
+            // Порядок граней BoxGeometry: +x, -x, +y, -y, +z, -z
+            const materials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+            blockMaterialsByType.set(def.id, materials);
+
+            const edgeMat = new THREE.LineBasicMaterial({
+                color: def.edgeColor,
+                transparent: true,
+                opacity: def.transparent ? 0.95 : 0.75
+            });
+            edgeMaterialsByType.set(def.id, edgeMat);
+        });
+
+        /**
+         * ============================================================================
+         * 3. ИНИЦИАЛИЗАЦИЯ THREE.JS СЦЕНЫ, НЕОНОВОГО КОСМОСА И ПОДСВЕТКИ
+         * ============================================================================
+         */
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x04060f);
+        scene.fog = new THREE.FogExp2(0x060918, 0.016);
+
+        const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 140);
+        camera.rotation.order = 'YXZ';
+
+        // Освещение сцены
+        const ambientLight = new THREE.AmbientLight(0x5b6abf, 0.78);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x00f3ff, 1.05);
+        dirLight.position.set(18, 32, 16);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        const accentLight = new THREE.PointLight(0xff007f, 1.4, 48);
+        accentLight.position.set(-10, 14, -12);
+        scene.add(accentLight);
+
+        // Неоновая сетка горизонта и звёздное поле
+        const gridHelper = new THREE.GridHelper(96, 96, 0xff007f, 0x162447);
+        gridHelper.position.y = -2.5;
+        scene.add(gridHelper);
+
+        const starGeo = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(700 * 3);
+        for (let i = 0; i < 700; i++) {
+            const r = 45 + Math.random() * 65;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.65;
+            starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            starPositions[i * 3 + 1] = r * Math.cos(phi) + 4;
+            starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0x00f3ff, size: 0.35, fog: false });
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        // Подсветка целевого блока (каркас) и грани установки
+        const targetWireframe = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(1.02, 1.02, 1.02)),
+            new THREE.LineBasicMaterial({ color: 0xffffff })
+        );
+        targetWireframe.visible = false;
+        scene.add(targetWireframe);
+
+        const faceHighlightMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.92, 0.92),
+            new THREE.MeshBasicMaterial({
+                color: 0x00f3ff,
+                transparent: true,
+                opacity: 0.32,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            })
+        );
+        faceHighlightMesh.visible = false;
+        scene.add(faceHighlightMesh);
+
+        /**
+         * ============================================================================
+         * 4. ХРАНИЛИЩЕ ВОКСЕЛЕЙ, ГЕНЕРАЦИЯ МИРА И СОХРАНЕНИЕ В LOCALSTORAGE
+         * ============================================================================
+         */
+        const STORAGE_KEY = 'neoncraft_3d_world_v1';
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        // Карта блоков: "x,y,z" -> { x, y, z, typeId, mesh }
+        const voxelMap = new Map();
+        const solidMeshes = [];
+
+        function coordKey(x, y, z) {
+            return `${x},${y},${z}`;
+        }
+
+        function hasBlockAt(x, y, z) {
+            return voxelMap.has(coordKey(x, y, z));
+        }
+
+        function setBlock(x, y, z, typeId, withSound = false) {
+            x = Math.round(x);
+            y = Math.round(y);
+            z = Math.round(z);
+
+            const def = BLOCK_MAP.get(typeId);
+            if (!def) return null;
+
+            const key = coordKey(x, y, z);
+            if (voxelMap.has(key)) {
+                removeBlock(x, y, z, false);
+            }
+
+            const mesh = new THREE.Mesh(boxGeometry, blockMaterialsByType.get(typeId));
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData = { x, y, z, typeId };
+
+            const edgeLine = new THREE.LineSegments(edgesGeometry, edgeMaterialsByType.get(typeId));
+            mesh.add(edgeLine);
+
+            worldGroup.add(mesh);
+            voxelMap.set(key, { x, y, z, typeId, mesh });
+            solidMeshes.push(mesh);
+
+            if (withSound) {
+                sound.placeBlock(def.pitch);
+                spawnParticles(x, y, z, def.edgeColor, 10);
+            }
+            return mesh;
+        }
+
+        function removeBlock(x, y, z, withSound = true) {
+            x = Math.round(x);
+            y = Math.round(y);
+            z = Math.round(z);
+
+            const key = coordKey(x, y, z);
+            const entry = voxelMap.get(key);
+            if (!entry) return false;
+
+            const def = BLOCK_MAP.get(entry.typeId);
+            worldGroup.remove(entry.mesh);
+            voxelMap.delete(key);
+
+            const idx = solidMeshes.indexOf(entry.mesh);
+            if (idx !== -1) solidMeshes.splice(idx, 1);
+
+            if (withSound && def) {
+                sound.breakBlock(def.pitch);
+                spawnParticles(x, y, z, def.edgeColor, 16);
+            }
+            return true;
+        }
+
+        function clearWorld() {
+            for (const entry of voxelMap.values()) {
+                worldGroup.remove(entry.mesh);
+            }
+            voxelMap.clear();
+            solidMeshes.length = 0;
+        }
+
+        /**
+         * Генерация стартового неонового ландшафта:
+         * холмистая платформа, неоновые башни, арки и кристаллы
+         */
+        function generateNeonLandscape() {
+            clearWorld();
+
+            const halfSize = 14; // Мир 29x29 по XZ
+            const phase = Math.random() * Math.PI * 2;
+
+            for (let x = -halfSize; x <= halfSize; x++) {
+                for (let z = -halfSize; z <= halfSize; z++) {
+                    const distFromCenter = Math.hypot(x, z);
+                    const hill =
+                        Math.sin(x * 0.25 + phase) * 1.4 +
+                        Math.cos(z * 0.25 - phase) * 1.4 +
+                        Math.sin((x + z) * 0.14) * 1.1;
+                    const topY = Math.max(0, Math.min(4, Math.round(hill + 1.5)));
+
+                    for (let y = 0; y <= topY; y++) {
+                        let typeId = 2; // Неоновый камень в глубине
+                        if (y === topY) {
+                            typeId = distFromCenter > halfSize - 2 ? 3 : 1; // Кибер-трава или пурпурный край
+                        }
+                        setBlock(x, y, z, typeId, false);
+                    }
+                }
+            }
+
+            // Неоновая башня-маяк на северо-западе
+            const towerX = -7;
+            const towerZ = -7;
+            const baseTowerY = getHighestBlockY(towerX, towerZ) + 1;
+            for (let h = 0; h < 7; h++) {
+                setBlock(towerX, baseTowerY + h, towerZ, h === 6 ? 5 : 3, false);
+            }
+            setBlock(towerX + 1, baseTowerY + 5, towerZ, 6, false);
+            setBlock(towerX - 1, baseTowerY + 5, towerZ, 6, false);
+            setBlock(towerX, baseTowerY + 5, towerZ + 1, 6, false);
+            setBlock(towerX, baseTowerY + 5, towerZ - 1, 6, false);
+
+            // Светящаяся арка на востоке
+            const archX = 7;
+            const archZ = -5;
+            const archBaseY = getHighestBlockY(archX, archZ) + 1;
+            for (let h = 0; h < 4; h++) {
+                setBlock(archX, archBaseY + h, archZ, 4, false);
+                setBlock(archX, archBaseY + h, archZ + 4, 4, false);
+            }
+            for (let step = 0; step <= 4; step++) {
+                setBlock(archX, archBaseY + 4, archZ + step, 5, false);
+            }
+
+            // Неоновый кристаллический кластер на юго-востоке
+            const crystalX = 6;
+            const crystalZ = 6;
+            const cBase = getHighestBlockY(crystalX, crystalZ) + 1;
+            setBlock(crystalX, cBase, crystalZ, 3, false);
+            setBlock(crystalX, cBase + 1, crystalZ, 3, false);
+            setBlock(crystalX, cBase + 2, crystalZ, 5, false);
+            setBlock(crystalX + 1, cBase, crystalZ, 6, false);
+            setBlock(crystalX, cBase, crystalZ + 1, 6, false);
+        }
+
+        function getHighestBlockY(x, z) {
+            x = Math.round(x);
+            z = Math.round(z);
+            for (let y = 24; y >= -5; y--) {
+                if (hasBlockAt(x, y, z)) return y;
+            }
+            return -1;
+        }
+
+        function saveWorldToStorage() {
+            const blocks = [];
+            for (const entry of voxelMap.values()) {
+                blocks.push([entry.x, entry.y, entry.z, entry.typeId]);
+            }
+            const payload = {
+                blocks,
+                player: {
+                    x: Number(player.pos.x.toFixed(2)),
+                    y: Number(player.pos.y.toFixed(2)),
+                    z: Number(player.pos.z.toFixed(2)),
+                    yaw: Number(player.yaw.toFixed(3)),
+                    pitch: Number(player.pitch.toFixed(3))
+                }
+            };
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+                showToast(`Мир сохранён (${blocks.length} блоков)`);
+            } catch (err) {
+                showToast('Ошибка сохранения в localStorage');
+            }
+        }
+
+        function loadWorldFromStorage(silent = false) {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    if (!silent) showToast('Сохранённый мир не найден');
+                    return false;
+                }
+                const data = JSON.parse(raw);
+                if (!Array.isArray(data.blocks)) return false;
+
+                clearWorld();
+                for (const item of data.blocks) {
+                    if (Array.isArray(item) && item.length === 4) {
+                        setBlock(item[0], item[1], item[2], item[3], false);
+                    }
+                }
+
+                if (data.player) {
+                    player.pos.set(data.player.x ?? 0, data.player.y ?? 6, data.player.z ?? 6);
+                    player.yaw = data.player.yaw ?? 0;
+                    player.pitch = data.player.pitch ?? 0;
+                    player.vel.set(0, 0, 0);
+                } else {
+                    resetPlayerPosition(true);
+                }
+
+                if (!silent) showToast(`Мир загружен (${data.blocks.length} блоков)`);
+                return true;
+            } catch (err) {
+                if (!silent) showToast('Не удалось прочитать сохранение');
+                return false;
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 5. ЭФФЕКТЫ ЧАСТИЦ ПРИ УСТАНОВКЕ И РАЗРУШЕНИИ БЛОКОВ
+         * ============================================================================
+         */
+        const particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+
+        function spawnParticles(bx, by, bz, colorHex, count = 12) {
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.position.set(
+                    bx + (Math.random() - 0.5) * 0.7,
+                    by + (Math.random() - 0.5) * 0.7,
+                    bz + (Math.random() - 0.5) * 0.7
+                );
+                worldGroup.add(mesh);
+
+                particles.push({
+                    mesh,
+                    vx: (Math.random() - 0.5) * 5.2,
+                    vy: Math.random() * 4.2 + 1.2,
+                    vz: (Math.random() - 0.5) * 5.2,
+                    life: 0.45 + Math.random() * 0.35,
+                    maxLife: 0.8
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    worldGroup.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+                p.vel.y -= 14 * dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                const s = Math.max(0.05, p.life / p.maxLife);
+                p.mesh.scale.set(s, s, s);
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 6. ФИЗИКА ОТ ПЕРВОГО ЛИЦА, ГРАВИТАЦИЯ, КОЛЛИЗИИ И ЗАЩИТА ОТ ЗАМУРОВАНИЯ
+         * ============================================================================
+         */
+        const player = {
+            pos: new THREE.Vector3(0, 7, 7),
+            vel: new THREE.Vector3(0, 0, 0),
+            yaw: 0,
+            pitch: 0,
+            radius: 0.32,
+            height: 1.72,
+            eyeHeight: 1.56,
+            onGround: false
+        };
+
+        const GRAVITY = -26;
+        const JUMP_SPEED = 8.6;
+        const MOVE_SPEED = 6.2;
+
+        function resetPlayerPosition(silent = false) {
+            const startX = 0;
+            const startZ = 7;
+            const topY = getHighestBlockY(startX, startZ);
+            const spawnY = Math.max(2, topY + 1.2);
+
+            player.pos.set(startX, spawnY, startZ);
+            player.vel.set(0, 0, 0);
+            player.yaw = 0;
+            player.pitch = -0.08;
+            player.onGround = false;
+
+            if (!silent) {
+                sound.uiClick();
+                showToast('Позиция сброшена');
+            }
+        }
+
+        // Проверка пересечения AABB игрока с блоками сетки
+        function collidesAt(px, py, pz) {
+            const minX = Math.floor(px - player.radius + 0.5);
+            const maxX = Math.floor(px + player.radius + 0.5);
+            const minY = Math.floor(py + 0.5);
+            const maxY = Math.floor(py + player.height - 0.04 + 0.5);
+            const minZ = Math.floor(pz - player.radius + 0.5);
+            const maxZ = Math.floor(pz + player.radius + 0.5);
+
+            for (let x = minX; x <= maxX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        if (hasBlockAt(x, y, z)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Проверка, не окажется ли новый блок вплотную внутри тела игрока (защита от замурования)
+        function wouldTrapPlayer(bx, by, bz) {
+            const bMinX = bx - 0.5;
+            const bMaxX = bx + 0.5;
+            const bMinY = by - 0.5;
+            const bMaxY = by + 0.5;
+            const bMinZ = bz - 0.5;
+            const bMaxZ = bz + 0.5;
+
+            const pMinX = player.pos.x - player.radius;
+            const pMaxX = player.pos.x + player.radius;
+            const pMinY = player.pos.y;
+            const pMaxY = player.pos.y + player.height;
+            const pMinZ = player.pos.z - player.radius;
+            const pMaxZ = player.pos.z + player.radius;
+
+            const overlapX = pMaxX > bMinX && pMinX < bMaxX;
+            const overlapY = pMaxY > bMinY && pMinY < bMaxY;
+            const overlapZ = pMaxZ > bMinZ && pMinZ < bMaxZ;
+
+            return overlapX && overlapY && overlapZ;
+        }
+
+        const keys = new Set();
+
+        function updatePlayer(dt) {
+            // Поворот камеры клавишами Q / E как запасной вариант
+            const turnSpeed = 2.1;
+            if (keys.has('KeyQ')) player.yaw += turnSpeed * dt;
+            if (keys.has('KeyE')) player.yaw -= turnSpeed * dt;
+
+            // Горизонтальное направление движения по текущему yaw
+            const forwardX = -Math.sin(player.yaw);
+            const forwardZ = -Math.cos(player.yaw);
+            const rightX = Math.cos(player.yaw);
+            const rightZ = -Math.sin(player.yaw);
+
+            let wishX = 0;
+            let wishZ = 0;
+            if (keys.has('KeyW') || keys.has('ArrowUp')) {
+                wishX += forwardX;
+                wishZ += forwardZ;
+            }
+            if (keys.has('KeyS') || keys.has('ArrowDown')) {
+                wishX -= forwardX;
+                wishZ -= forwardZ;
+            }
+            if (keys.has('KeyD') || keys.has('ArrowRight')) {
+                wishX += rightX;
+                wishZ += rightZ;
+            }
+            if (keys.has('KeyA') || keys.has('ArrowLeft')) {
+                wishX -= rightX;
+                wishZ -= rightZ;
+            }
+
+            const len = Math.hypot(wishX, wishZ);
+            if (len > 0) {
+                wishX = (wishX / len) * MOVE_SPEED;
+                wishZ = (wishZ / len) * MOVE_SPEED;
+            }
+
+            player.vel.x = wishX;
+            player.vel.z = wishZ;
+
+            // Прыжок при удержании Space на земле
+            if (keys.has('Space') && player.onGround) {
+                player.vel.y = JUMP_SPEED;
+                player.onGround = false;
+                sound.jump();
+            }
+
+            // Гравитация
+            player.vel.y += GRAVITY * dt;
+            if (player.vel.y < -32) player.vel.y = -32;
+
+            // Раздельное решение коллизий по осям X, Z и Y
+            const nextX = player.pos.x + player.vel.x * dt;
+            if (!collidesAt(nextX, player.pos.y, player.pos.z)) {
+                player.pos.x = nextX;
+            } else {
+                player.vel.x = 0;
+            }
+
+            const nextZ = player.pos.z + player.vel.z * dt;
+            if (!collidesAt(player.pos.x, player.pos.y, nextZ)) {
+                player.pos.z = nextZ;
+            } else {
+                player.vel.z = 0;
+            }
+
+            const nextY = player.pos.y + player.vel.y * dt;
+            if (!collidesAt(player.pos.x, nextY, player.pos.z)) {
+                player.pos.y = nextY;
+                player.onGround = false;
+            } else {
+                if (player.vel.y < 0) {
+                    player.onGround = true;
+                }
+                player.vel.y = 0;
+            }
+
+            // Страховка от падения в бесконечную пустоту
+            if (player.pos.y < -14) {
+                resetPlayerPosition(true);
+                showToast('Возврат на неоновую платформу');
+            }
+
+            // Синхронизация камеры с глазами игрока
+            camera.position.set(player.pos.x, player.pos.y + player.eyeHeight, player.pos.z);
+            camera.rotation.y = player.yaw;
+            camera.rotation.x = player.pitch;
+
+            coordsBadge.textContent = `X: ${Math.round(player.pos.x)} Y: ${Math.round(player.pos.y)} Z: ${Math.round(player.pos.z)}`;
+        }
+
+        /**
+         * ============================================================================
+         * 7. RAYCASTING, ПОДСВЕТКА ГРАНИ, СТРОИТЕЛЬСТВО И РАЗРУШЕНИЕ БЛОКОВ
+         * ============================================================================
+         */
+        const raycaster = new THREE.Raycaster();
+        raycaster.far = 7.5; // Дальность действия рук игрока в блоках
+        const centerNDC = new THREE.Vector2(0, 0);
+
+        let hoveredTarget = null; // { blockPos: {x,y,z}, placePos: {x,y,z}, normal: THREE.Vector3 }
+
+        function updateTargetHighlight() {
+            raycaster.setFromCamera(centerNDC, camera);
+            const hits = raycaster.intersectObjects(solidMeshes, false);
+
+            if (hits.length > 0 && hits[0].face) {
+                const hit = hits[0];
+                const { x, y, z } = hit.object.userData;
+                const normal = hit.face.normal.clone().round();
+
+                const placePos = {
+                    x: x + normal.x,
+                    y: y + normal.y,
+                    z: z + normal.z
+                };
+
+                hoveredTarget = {
+                    blockPos: { x, y, z },
+                    placePos,
+                    normal
+                };
+
+                targetWireframe.visible = true;
+                targetWireframe.position.set(x, y, z);
+
+                // Подсветка конкретной грани установки
+                const canPlace = !wouldTrapPlayer(placePos.x, placePos.y, placePos.z);
+                faceHighlightMesh.visible = canPlace;
+                faceHighlightMesh.material.color.setHex(
+                    BLOCK_MAP.get(selectedBlockId)?.edgeColor || 0x00f3ff
+                );
+                faceHighlightMesh.position.set(
+                    x + normal.x * 0.505,
+                    y + normal.y * 0.505,
+                    z + normal.z * 0.505
+                );
+                faceHighlightMesh.lookAt(
+                    faceHighlightMesh.position.x + normal.x,
+                    faceHighlightMesh.position.y + normal.y,
+                    faceHighlightMesh.position.z + normal.z
+                );
+            } else {
+                hoveredTarget = null;
+                targetWireframe.visible = false;
+                faceHighlightMesh.visible = false;
+            }
+        }
+
+        let selectedBlockId = 1;
+
+        function handleBuildAction() {
+            updateTargetHighlight();
+            if (!hoveredTarget) return;
+            const { x, y, z } = hoveredTarget.placePos;
+
+            if (wouldTrapPlayer(x, y, z)) {
+                showToast('Нельзя поставить блок прямо в игрока!');
+                sound.uiClick();
+                return;
+            }
+
+            setBlock(x, y, z, selectedBlockId, true);
+            updateTargetHighlight();
+        }
+
+        function handleBreakAction() {
+            updateTargetHighlight();
+            if (!hoveredTarget) return;
+            const { x, y, z } = hoveredTarget.blockPos;
+            removeBlock(x, y, z, true);
+            updateTargetHighlight();
+        }
+
+        /**
+         * ============================================================================
+         * 8. ИНТЕРФЕЙС ХОТБАРА, КНОПКИ, УПРАВЛЕНИЕ МЫШЬЮ/КЛАВИАТУРОЙ И ЦИКЛ
+         * ============================================================================
+         */
+        const hotbarEl = document.getElementById('hotbar');
+        const toastEl = document.getElementById('toast');
+        const coordsBadge = document.getElementById('coordsBadge');
+        const helpModal = document.getElementById('helpModal');
+
+        let toastTimer = null;
+        function showToast(text) {
+            toastEl.textContent = text;
+            toastEl.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toastEl.classList.remove('show');
+            }, 1800);
+        }
+
+        function renderHotbar() {
+            hotbarEl.innerHTML = '';
+            BLOCK_TYPES.forEach(def => {
+                const slot = document.createElement('button');
+                slot.type = 'button';
+                slot.className = 'hotbar-slot' + (def.id === selectedBlockId ? ' selected' : '');
+                slot.title = `${def.name} (${def.key})`;
+                slot.innerHTML = `
+                    <span class="slot-key">${def.key}</span>
+                    <span class="block-swatch" style="background: ${def.color}; box-shadow: 0 0 10px ${def.color};"></span>
+                    <span class="slot-name">${def.name}</span>
+                `;
+                slot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectBlock(def.id);
+                });
+                hotbarEl.appendChild(slot);
+            });
+        }
+
+        function selectBlock(id) {
+            if (!BLOCK_MAP.has(id)) return;
+            selectedBlockId = id;
+            renderHotbar();
+            sound.uiClick();
+            const def = BLOCK_MAP.get(id);
+            showToast(`Блок: ${def.name}`);
+        }
+
+        // Кнопки верхней панели
+        document.getElementById('newWorldBtn').addEventListener('click', () => {
+            sound.uiClick();
+            generateNeonLandscape();
+            resetPlayerPosition(true);
+            showToast('Сгенерирован новый неоновый мир');
+        });
+
+        document.getElementById('saveWorldBtn').addEventListener('click', () => {
+            sound.uiClick();
+            saveWorldToStorage();
+        });
+
+        document.getElementById('loadWorldBtn').addEventListener('click', () => {
+            sound.uiClick();
+            loadWorldFromStorage(false);
+        });
+
+        document.getElementById('resetPosBtn').addEventListener('click', () => {
+            resetPlayerPosition(false);
+        });
+
+        let glowEnhanced = true;
+        const glowToggleBtn = document.getElementById('glowToggleBtn');
+        glowToggleBtn.addEventListener('click', () => {
+            sound.uiClick();
+            glowEnhanced = !glowEnhanced;
+            document.body.classList.toggle('high-contrast', glowEnhanced);
+            ambientLight.intensity = glowEnhanced ? 0.85 : 1.05;
+            accentLight.intensity = glowEnhanced ? 1.8 : 0.7;
+            glowToggleBtn.classList.toggle('active', glowEnhanced);
+            glowToggleBtn.textContent = glowEnhanced ? 'Свечение: Яркое' : 'Свечение: Мягкое';
+            showToast(glowEnhanced ? 'Режим яркой неоновой подсветки' : 'Мягкий режим освещения');
+        });
+
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        soundToggleBtn.addEventListener('click', () => {
+            const muted = sound.toggleMute();
+            soundToggleBtn.classList.toggle('muted', muted);
+            soundToggleBtn.textContent = muted ? 'Звук: Выкл' : 'Звук: Вкл';
+            if (!muted) sound.uiClick();
+        });
+
+        const helpBtn = document.getElementById('helpBtn');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        helpBtn.addEventListener('click', () => {
+            sound.uiClick();
+            if (document.pointerLockElement === canvas) {
+                document.exitPointerLock?.();
+            }
+            helpModal.classList.remove('hidden');
+        });
+        closeHelpBtn.addEventListener('click', () => {
+            sound.uiClick();
+            helpModal.classList.add('hidden');
+        });
+
+        // Блокируем стандартное контекстное меню на ПКМ по холсту
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Осмотр мышью: Pointer Lock + запасной режим перетаскивания
+        let isDraggingLook = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+        let pointerMovedDistance = 0;
+        const sensitivity = 0.0024;
+        const dragSensitivity = 0.0045;
+
+        function applyLookDelta(dx, dy) {
+            player.yaw -= dx;
+            player.pitch -= dy;
+            const maxPitch = Math.PI / 2 - 0.04;
+            player.pitch = Math.max(-maxPitch, Math.min(maxPitch, player.pitch));
+        }
+
+        function requestCanvasPointerLock() {
+            if (!canvas.requestPointerLock) return;
+            try {
+                const promise = canvas.requestPointerLock();
+                if (promise && typeof promise.catch === 'function') {
+                    promise.catch(() => {
+                        // Если Pointer Lock заблокирован окружением, продолжит работать перетаскивание и Q/E
+                    });
+                }
+            } catch (_) {}
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!helpModal.classList.contains('hidden')) return;
+            sound.ensureContext();
+
+            if (document.pointerLockElement !== canvas) {
+                requestCanvasPointerLock();
+                isDraggingLook = true;
+                lastPointerX = e.clientX;
+                lastPointerY = e.clientY;
+                pointerMovedDistance = 0;
+                return;
+            }
+
+            if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                handleBreakAction();
+            } else if (e.button === 0) {
+                handleBuildAction();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!helpModal.classList.contains('hidden')) return;
+
+            if (document.pointerLockElement === canvas) {
+                applyLookDelta(e.movementX * sensitivity, e.movementY * sensitivity);
+            } else if (isDraggingLook) {
+                const dx = e.clientX - lastPointerX;
+                const dy = e.clientY - lastPointerY;
+                lastPointerX = e.clientX;
+                lastPointerY = e.clientY;
+                pointerMovedDistance += Math.hypot(dx, dy);
+                applyLookDelta(dx * dragSensitivity, dy * dragSensitivity);
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isDraggingLook) return;
+            const wasClick = pointerMovedDistance < 6;
+            isDraggingLook = false;
+
+            // Если пользователь кликнул без перетаскивания (например, когда Pointer Lock недоступен)
+            if (wasClick && document.pointerLockElement !== canvas) {
+                if (e.button === 2 || (e.button === 0 && e.shiftKey)) {
+                    handleBreakAction();
+                } else if (e.button === 0) {
+                    handleBuildAction();
+                }
+            }
+        });
+
+        // Сенсорное управление для планшетов и экранов с тачем
+        let touchId = null;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let touchMoved = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!helpModal.classList.contains('hidden')) return;
+            sound.ensureContext();
+            if (touchId === null && e.touches.length > 0) {
+                const t = e.touches[0];
+                touchId = t.identifier;
+                lastTouchX = t.clientX;
+                lastTouchY = t.clientY;
+                touchMoved = 0;
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (touchId === null) return;
+            for (const t of e.touches) {
+                if (t.identifier === touchId) {
+                    const dx = t.clientX - lastTouchX;
+                    const dy = t.clientY - lastTouchY;
+                    lastTouchX = t.clientX;
+                    lastTouchY = t.clientY;
+                    touchMoved += Math.hypot(dx, dy);
+                    applyLookDelta(dx * dragSensitivity, dy * dragSensitivity);
+                    break;
+                }
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (touchId === null) return;
+            for (const t of e.changedTouches) {
+                if (t.identifier === touchId) {
+                    if (touchMoved < 8) {
+                        handleBuildAction();
+                    }
+                    touchId = null;
+                    break;
+                }
+            }
+        }, { passive: true });
+
+        // Переключение слотов хотбара колёсиком мыши
+        window.addEventListener('wheel', (e) => {
+            if (!helpModal.classList.contains('hidden')) return;
+            const idx = BLOCK_TYPES.findIndex(b => b.id === selectedBlockId);
+            const dir = e.deltaY > 0 ? 1 : -1;
+            const nextIdx = (idx + dir + BLOCK_TYPES.length) % BLOCK_TYPES.length;
+            selectBlock(BLOCK_TYPES[nextIdx].id);
+        }, { passive: true });
+
+        // Клавиатура
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Escape' && !helpModal.classList.contains('hidden')) {
+                helpModal.classList.add('hidden');
+                return;
+            }
+            if (!helpModal.classList.contains('hidden')) return;
+
+            keys.add(e.code);
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+            }
+
+            // Выбор блоков 1–6
+            if (e.key >= '1' && e.key <= '6') {
+                selectBlock(parseInt(e.key, 10));
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys.delete(e.code);
+        });
+
+        window.addEventListener('blur', () => {
+            keys.clear();
+            isDraggingLook = false;
+        });
+
+        // Адаптация размеров при изменении окна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Главный игровой цикл
+        let lastFrameTime = performance.now();
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+            lastFrameTime = now;
+
+            if (helpModal.classList.contains('hidden')) {
+                updatePlayer(dt);
+                updateTargetHighlight();
+            } else {
+                targetWireframe.visible = false;
+                faceHighlightMesh.visible = false;
+            }
+
+            updateParticles(dt);
+            renderer.render(scene, camera);
+        }
+
+        // Старт игры при загрузке страницы
+        window.onload = function () {
+            renderHotbar();
+            generateNeonLandscape();
+            resetPlayerPosition(true);
+            glowToggleBtn.classList.add('active');
+            glowToggleBtn.textContent = 'Свечение: Яркое';
+            animate(performance.now());
+        };
+    </script>
+</body>
+</html>

@@ -189,8 +189,8 @@
         /* Сетка карточек игр */
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 28px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
             width: 100%;
         }
 
@@ -201,7 +201,7 @@
             backdrop-filter: blur(14px);
             border-radius: 24px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 24px;
+            padding: 22px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -236,6 +236,11 @@
         .game-card.pink-theme:hover {
             border-color: rgba(255, 0, 127, 0.65);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(255, 0, 127, 0.24);
+        }
+
+        .game-card.lime-theme:hover {
+            border-color: rgba(57, 255, 20, 0.65);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(57, 255, 20, 0.22);
         }
 
         .game-card:hover::before {
@@ -285,6 +290,11 @@
         .pink-theme .genre-tag {
             border-color: rgba(255, 0, 127, 0.45);
             color: var(--neon-pink);
+        }
+
+        .lime-theme .genre-tag {
+            border-color: rgba(57, 255, 20, 0.45);
+            color: var(--neon-green);
         }
 
         /* Информация об игре */
@@ -399,6 +409,20 @@
             box-shadow: 0 0 14px rgba(255, 0, 127, 0.5), 0 1px 0 #831843;
         }
 
+        .play-btn.lime {
+            color: #050711;
+            background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan));
+            box-shadow: 0 0 22px rgba(57, 255, 20, 0.4), 0 4px 0 #065f46;
+        }
+
+        .play-btn.lime:hover {
+            box-shadow: 0 0 32px rgba(57, 255, 20, 0.75), 0 6px 0 #065f46;
+        }
+
+        .play-btn.lime:active {
+            box-shadow: 0 0 14px rgba(57, 255, 20, 0.5), 0 1px 0 #065f46;
+        }
+
         /* Подвал сайта */
         footer {
             position: relative;
@@ -429,6 +453,11 @@
             50% { transform: translateY(-6px); }
         }
 
+        @keyframes pulseVoxel {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-4px) scale(1.03); }
+        }
+
         .svg-ball {
             animation: floatBall 2.8s ease-in-out infinite;
         }
@@ -437,8 +466,18 @@
             animation: pulseShip 2.4s ease-in-out infinite;
         }
 
+        .svg-voxel {
+            animation: pulseVoxel 2.6s ease-in-out infinite;
+        }
+
         /* Адаптивность для планшетов и смартфонов */
-        @media (max-width: 820px) {
+        @media (max-width: 1024px) {
+            .games-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 720px) {
             .games-grid {
                 grid-template-columns: 1fr;
                 max-width: 540px;
@@ -483,7 +522,7 @@
         <section class="hero">
             <div class="hero-badge">Cyberpunk &amp; Synthwave Collection</div>
             <h1>NEON ARCADE HUB</h1>
-            <p>Выберите симуляцию. Динамичная неоновая 2D-аркада или скоростной 3D-полёт по кибертрассе — всё запускается мгновенно прямо в браузере.</p>
+            <p>Выберите игру из коллекции: неоновый 2D-арканоид, скоростная 3D-гонка или воксельный 3D-мир в стиле Minecraft с неоновыми блоками.</p>
         </section>
 
         <section class="games-grid">
@@ -550,7 +589,7 @@
                     </div>
                 </div>
 
-                <a href="arkanoid.html" class="play-btn" data-sound="click">
+                <a href="neonarcane.html" class="play-btn" data-sound="click">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
@@ -618,11 +657,74 @@
                     </div>
                 </div>
 
-                <a href="rush3d.html" class="play-btn pink" data-sound="click">
+                <a href="neonracer.html" class="play-btn pink" data-sound="click">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
                     <span>Запустить 3D</span>
+                </a>
+            </article>
+
+            <!-- Карточка 3: NEONCRAFT 3D (Воксельный мир) -->
+            <article class="game-card lime-theme" data-sound="hover">
+                <div>
+                    <div class="preview-box">
+                        <span class="genre-tag">3D Песочница</span>
+                        <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="bgVoxel" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#060919"/>
+                                    <stop offset="100%" stop-color="#0b1628"/>
+                                </linearGradient>
+                            </defs>
+                            <rect width="400" height="200" fill="url(#bgVoxel)"/>
+                            <!-- Нижняя неоновая платформа -->
+                            <polygon points="90,152 200,192 310,152 200,112" fill="#0d252a" stroke="#00f3ff" stroke-width="1.5"/>
+                            <!-- Воксельный неоновый куб 1 (лайм) -->
+                            <g class="svg-voxel">
+                                <polygon points="155,112 182,102 209,112 182,122" fill="#7dff63" stroke="#39ff14" stroke-width="1.5"/>
+                                <polygon points="155,112 182,122 182,150 155,140" fill="#16422b" stroke="#39ff14" stroke-width="1.5"/>
+                                <polygon points="182,122 209,112 209,140 182,150" fill="#0d2c1e" stroke="#39ff14" stroke-width="1.5"/>
+                            </g>
+                            <!-- Воксельный неоновый куб 2 (розовый/фиолетовый кристалл) -->
+                            <g class="svg-voxel" style="animation-delay: 0.4s;">
+                                <polygon points="212,96 239,86 266,96 239,106" fill="#ff66b2" stroke="#ff007f" stroke-width="1.5"/>
+                                <polygon points="212,96 239,106 239,134 212,124" fill="#3b0d38" stroke="#ff007f" stroke-width="1.5"/>
+                                <polygon points="239,106 266,96 266,124 239,134" fill="#240724" stroke="#ff007f" stroke-width="1.5"/>
+                            </g>
+                            <!-- Верхний куб-маяк -->
+                            <g class="svg-voxel" style="animation-delay: 0.8s;">
+                                <polygon points="184,74 204,67 224,74 204,81" fill="#ffe066" stroke="#ffbe0b" stroke-width="1.5"/>
+                                <polygon points="184,74 204,81 204,99 184,92" fill="#4a3108" stroke="#ffbe0b" stroke-width="1.5"/>
+                                <polygon points="204,81 224,74 224,92 204,99" fill="#2e1e05" stroke="#ffbe0b" stroke-width="1.5"/>
+                            </g>
+                        </svg>
+                    </div>
+
+                    <div class="card-header">
+                        <h2 class="card-title">NEONCRAFT 3D</h2>
+                        <div class="highscore-badge">
+                            <span>Сохранено</span>
+                            <strong id="scoreNeoncraft">0 бл.</strong>
+                        </div>
+                    </div>
+
+                    <p class="card-desc">
+                        Воксельный мир от первого лица с гравитацией, прыжками, установкой и разрушением неоновых блоков, хотбаром из 6 типов блоков и сохранением мира.
+                    </p>
+
+                    <div class="features-list">
+                        <span class="feature-chip">6 неоновых блоков</span>
+                        <span class="feature-chip">Вид от 1-го лица</span>
+                        <span class="feature-chip">Сохранение мира</span>
+                    </div>
+                </div>
+
+                <a href="neoncraft.html" class="play-btn lime" data-sound="click">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Войти в мир</span>
                 </a>
             </article>
         </section>
@@ -647,6 +749,16 @@
 
                 document.getElementById('scoreArkanoid').textContent = parseInt(arkanoidBest, 10).toLocaleString('ru-RU');
                 document.getElementById('scoreRush3d').textContent = parseInt(rush3dBest, 10).toLocaleString('ru-RU');
+
+                const rawWorld = localStorage.getItem('neoncraft_3d_world_v1');
+                let savedBlocksCount = 0;
+                if (rawWorld) {
+                    const parsed = JSON.parse(rawWorld);
+                    if (Array.isArray(parsed.blocks)) {
+                        savedBlocksCount = parsed.blocks.length;
+                    }
+                }
+                document.getElementById('scoreNeoncraft').textContent = `${savedBlocksCount.toLocaleString('ru-RU')} бл.`;
             } catch (e) {
                 // Безопасный фолбэк, если доступ к localStorage ограничен
             }
